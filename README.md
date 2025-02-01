@@ -17,3 +17,11 @@ Consider using videos of the same resolution as your device's.
 Processing usage test : AMD Ryzen 5 5600G with Radeon Graphics, Full HD Resolution (1920*1080)
 - When active window is maximized or full screen : ~0.7%
 - When active window isn't maximized or full screen : ~10%
+
+To use the configurate the app, select "Config" in the hidden icon.
+Use arrows to navigate through the UI.
+Up and down for switching parameters and left and right for modifying the value.
+When done, press ENTER to save the configurations.
+KEEP IN MIND THAT IF ANY MODIFYED PARAMETERS MAKE THE APP CRASH, ALL THE PARAMETERS ARE RESETED TO AVOID CRASH.
+
+To exit the app, select "Exit" in the hidden icon.
