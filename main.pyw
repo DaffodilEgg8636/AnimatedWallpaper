@@ -12,6 +12,7 @@ from pystray import Icon, MenuItem, Menu
 from PIL import Image, ImageDraw
 import pygetwindow as gw
 import ctypes
+import subprocess
 
 # Importing custom libraries
 from classes import *
@@ -21,6 +22,33 @@ from functions import *
 # Lower the process priority
 p = psutil.Process(os.getpid())
 p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)  
+
+
+# Contains every app parameter affected by the config.json file
+def config_changes():
+    global config, video_path, cap, FPS
+    for i in range(20):
+        try:
+            # Reading the video
+            video_path = f'videos/{config["current"]}.mp4'
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                raise ValueError("This video does not exist")
+
+            # Setting the frame rate
+            FPS = config["fps"]
+            if FPS == 0:
+                raise ValueError("FPS can not be equal to 0")
+
+            break
+        except:
+            # Reading the config backup
+            with open("config_backup.json", "r") as f:
+                config = json.load(f)
+            # Rewriting the config.json file
+            with open("config.json", "w") as f:
+                json.dump(config, f)
+
 
 # Making an icon in the hidden icons menu
 system_tray_started = False
@@ -43,7 +71,18 @@ def setup_system_tray():
             window = windows[0]
             window.close()
 
-    menu = Menu(MenuItem('Exit', on_exit))
+    def open_config():
+        # Open the configuration window
+        subprocess.run(['python', 'config_menu.py'])
+        global config
+        # Rereading the config
+        with open("config.json", "r") as f:
+            config = json.load(f)
+        # Updating all the parameters
+        config_changes()
+
+
+    menu = Menu(MenuItem("Config", open_config), MenuItem('Exit', on_exit))
     icon = Icon("Pygame Zero App", create_image(), "AnimatedWallpaper", menu)
     icon.run()
 
@@ -74,15 +113,11 @@ with open("config.json", "r") as f:
 # Getting the user's username
 username = os.getlogin()
 
-# Reading the video
-video_path = f'videos/{config["current"]}.mp4'
-cap = cv2.VideoCapture(video_path)
+# Sets up the config on start
+config_changes()
 
 # Allowing for the vid to beging
 frame_surface = None
-
-# Setting the frame rate
-FPS = config["fps"]
 
 win = pygame.display.get_wm_info()['window']
 oldtime_ = time.time()
