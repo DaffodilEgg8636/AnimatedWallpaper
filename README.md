@@ -2,7 +2,7 @@ PLEASE READ CAREFULLY BEFORE USING THE APP OR REPORTING SOMETHING
 
 BEFORE RUNNING THE APP, EXECUTE THE REQUIREMENTS FILE TO INSTALL ALL DEPENDENCIES
 
-The animations used in this app are videos in .mp4 format necessarily.
+The animations used in this app must necesserily be videos in .mp4 format.
 They have to be inserted in the "videos" folder.
 They have to be named as numbers from "0" and so on.
 
@@ -22,6 +22,6 @@ To use the configurate the app, select "Config" in the hidden icon.
 Use arrows to navigate through the UI.
 Up and down for switching parameters and left and right for modifying the value.
 When done, press ENTER to save the configurations.
-KEEP IN MIND THAT IF ANY MODIFYED PARAMETERS MAKE THE APP CRASH, ALL THE PARAMETERS ARE RESETED TO AVOID CRASH.
+KEEP IN MIND THAT IF ANY MODIFIED PARAMETERS CAUSE THE APP TO CRASH, ALL THE PARAMETERS ARE RESETED.
 
 To exit the app, select "Exit" in the hidden icon.
