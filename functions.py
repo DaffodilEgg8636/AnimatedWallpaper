@@ -1,50 +1,41 @@
-import os
-import cv2
+import json
+import pygetwindow as gw
 
-# Returning a list of images with a specific path
-def get_images(current):
-    path = f"images/{current}"
-    files = os.listdir(path)
-    images = [file for file in files if file.endswith('.png')]
-    return images
+# Reading the config
+with open("config.json", "r") as f:
+    config = json.load(f)
 
-# Transforming a video into images in a specific path
-def make_images(path):
-    # Reading the video
-    video = cv2.VideoCapture(path)
-    frame_list = []
-    frame_count = 0
-    while video.isOpened():
-        ret, frame = video.read()  # Capture frame-by-frame
-        if ret:
-            # Add the frame to the list
-            frame_list.append(frame)
-            frame_count += 1
-        else:
-            break
-    video.release()
-    
-    # Saving images
-    count = 0
-    while True:
-        if os.path.exists(f"images/{count}"):
-            count += 1
-        else:
-            break
-    
-    save_path = f"images/{count}"
-    # Making the directory
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    # Save each frame as a .png file
-    for frame_count, frame in enumerate(frame_list):
-        # Construct the filename
-        frame_filename = os.path.join(save_path, f'frame_{frame_count:04d}.png')
-        
-        # Save the frame as a .png file
-        cv2.imwrite(frame_filename, frame)
-    
-    # Desinstalling the video
-    video_path = f"{path}/vid_install.mp4"
-    if os.path.exists(video_path):
-        os.remove(video_path)
+# Setting the function for video reloading/changing
+def vid_reload():
+	global config
+	return f'videos/{config["current"]}'
+
+
+# Looking if the user is using an app that is in fullscreen
+def window_maximized():
+	# Get all the open windows
+	windows = gw.getAllWindows()
+
+	opti = True
+#    for window in windows:
+#        # Check if any window is maximized (potentially fullscreen)
+#        if window.isVisible and window.title != "VideoBackgroundAnimation12354951":
+#            opti = False
+	active_window = gw.getActiveWindow()
+	if (active_window == None or active_window.title != "VideoBackgroundAnimation12354951"):
+		if active_window != None and active_window.isMaximized:
+			opti = False
+
+	return opti
+
+# Going to the previously used window if the pgz win selected
+def if_pgz_active_win(oldwin):
+	actwin = gw.getActiveWindow()
+	if actwin != None:
+		if actwin.title == "VideoBackgroundAnimation12354951":
+			oldwin[0].activate()
+			return oldwin
+		else:
+			return gw.getWindowsWithTitle(gw.getActiveWindowTitle())
+	else:
+		return oldwin
