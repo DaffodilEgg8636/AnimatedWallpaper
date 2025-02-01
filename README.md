@@ -1,4 +1,5 @@
 PLEASE READ CAREFULLY BEFORE USING THE APP OR REPORTING SOMETHING
+BEFORE RUNNING THE APP, EXECUTE THE REQUIREMENTS FILE TO INSTALL ALL DEPENDENCIES
 
 The animations used in this app are videos in .mp4 format necessarily.
 They have to be inserted in the "videos" folder.
