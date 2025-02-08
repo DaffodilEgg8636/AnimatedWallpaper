@@ -13,16 +13,23 @@ from PIL import Image, ImageDraw
 import pygetwindow as gw
 import ctypes
 import subprocess
+import gc
+import weakref
+import pyopencl as cl
+import numpy as np
 
 # Importing custom libraries
 from classes import *
 from functions import *
 
 
+# Enable the garbage collector
+gc.enable()
+
 # Lower the process priority
 p = psutil.Process(os.getpid())
 p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)  
-
+p = None; del p
 
 # Contains every app parameter affected by the config.json file
 def config_changes():
@@ -53,16 +60,19 @@ def config_changes():
 # Making an icon in the hidden icons menu
 system_tray_started = False
 
+icon_image = None
 def create_image():
+    global icon_image
     """Create an icon for the system tray."""
-    image = Image.new('RGB', (64, 64), (255, 255, 255))
-    draw = ImageDraw.Draw(image)
+    icon_image = Image.new('RGB', (64, 64), (255, 255, 255))
+    draw = ImageDraw.Draw(icon_image)
     draw.rectangle((16, 16, 48, 48), fill=(0, 0, 255))
-    return image
+    locals().clear()
 
 def setup_system_tray():
+    global icon_image
     """Set up the system tray icon and menu."""
-    def on_exit(icon, item):
+    def on_exit(icon):
         icon.stop()
         # Stop the game when the tray icon menu is exited
         windows = gw.getWindowsWithTitle('VideoBackgroundAnimation12354951')
@@ -70,6 +80,7 @@ def setup_system_tray():
             # If the window exists, close it
             window = windows[0]
             window.close()
+        locals().clear()
 
     def open_config():
         # Open the configuration window
@@ -83,7 +94,8 @@ def setup_system_tray():
 
 
     menu = Menu(MenuItem("Config", open_config), MenuItem('Exit', on_exit))
-    icon = Icon("Pygame Zero App", create_image(), "AnimatedWallpaper", menu)
+    create_image()
+    icon = Icon("Pygame Zero App", icon_image, "AnimatedWallpaper", menu)
     icon.run()
 
 def start_tray_thread():
@@ -94,10 +106,12 @@ def start_tray_thread():
 
 # Call the function to start the thread
 start_tray_thread()
+icon_image = None; del icon_image
 
 # Setting the screen resolution to full screen dynamically
 monitor = get_monitors()[0]
 width, height = monitor.width, monitor.height-10
+monitor = None; del monitor
 # Setting the window position
 os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
 
@@ -105,76 +119,172 @@ import pgzrun
 
 WIDTH = width
 HEIGHT = height
+width = None; del width
+height = None; del height
 TITLE = "VideoBackgroundAnimation12354951"
 
 # Reading the config
 with open("config.json", "r") as f:
     config = json.load(f)
-# Getting the user's username
-username = os.getlogin()
 
 # Sets up the config on start
 config_changes()
 
 # Allowing for the vid to beging
-frame_surface = None
+frame = None
+
+
+# Create an OpenCL context
+platform = cl.get_platforms()[0]  # Select the first platform (e.g., NVIDIA, AMD)
+device = platform.get_devices()[0]  # Select the first device (GPU or CPU)
+context = cl.Context([device])
+queue = cl.CommandQueue(context)
+
+# OpenCL kernel to rotate and flip the image
+transform_kernel = """
+__kernel void transform_image(__global uchar *input_image, 
+                              __global uchar *output_image,
+                              const unsigned int input_width, 
+                              const unsigned int input_height,
+                              const unsigned int output_width, 
+                              const unsigned int output_height) {
+
+    int i = get_global_id(0);  // X-coordinate in output
+    int j = get_global_id(1);  // Y-coordinate in output
+
+    if (i < output_width && j < output_height) {
+        // Correct 90° counterclockwise rotation
+        int src_x = j;
+        int src_y = input_width - 1 - i;
+
+        // Horizontal flip (AFTER rotation)
+        int flip_x = input_width - 1 - src_x;
+
+        // Ensure within valid bounds
+        if (flip_x >= 0 && flip_x < input_width && src_y >= 0 && src_y < input_height) {
+            int input_index = (src_y * input_width + flip_x) * 3;  
+            int output_index = (j * output_width + i) * 3;  // ✅ FIXED INDEXING
+
+            // Copy RGB values
+            output_image[output_index] = input_image[input_index];
+            output_image[output_index + 1] = input_image[input_index + 1];
+            output_image[output_index + 2] = input_image[input_index + 2];
+        }
+    }
+}
+"""
+
+# Compile the OpenCL program
+rotate_flip_cl = cl.Program(context, transform_kernel).build()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 win = pygame.display.get_wm_info()['window']
-oldtime_ = time.time()
 oldtime = time.time()
 oldwin = None
-def update():
-    global FPS, frame_surface, video_path, oldtime, win, oldwin
+def update_():
+    global FPS, frame, video_path, oldtime, win, oldwin, oldtime_g, rotate_flip_cl
+    acttime = time.time()
     if window_maximized():
-        acttime = time.time()
-        if acttime >= oldtime+1/FPS:
-            if oldwin == None:
-                ctypes.windll.user32.SetWindowPos(win, 1, 0, 0, 0, 0, 0x0002)
-                if gw.getActiveWindowTitle() != "VideoBackgroundAnimation12354951" and gw.getActiveWindowTitle() != None:
-                    oldwin = gw.getWindowsWithTitle(gw.getActiveWindowTitle())
-            else:
-                try:
-                    oldwin = if_pgz_active_win(oldwin)
-                except:
-                    pass
-            # Check if we need to read the next frame
-            if frame_surface is None:
+        #if acttime >= oldtime+1/FPS:
+        if oldwin == None:
+            ctypes.windll.user32.SetWindowPos(win, 1, 0, 0, 0, 0, 0x0002)
+            if gw.getActiveWindowTitle() != "VideoBackgroundAnimation12354951" and gw.getActiveWindowTitle() != None:
+                oldwin = gw.getWindowsWithTitle(gw.getActiveWindowTitle())
+        else:
+            try:
+                oldwin = if_pgz_active_win(oldwin)
+            except:
+                pass
+        # Check if we need to read the next frame
+        if frame is None:
+            ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Restart video from the beginning if it reaches the end
                 ret, frame = cap.read()
-                if not ret:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Restart video from the beginning if it reaches the end
-                    ret, frame = cap.read()
                     
-                # Convert BGR to RGB (OpenCV uses BGR by default)
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Convert BGR to RGB (OpenCV uses BGR by default)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+
+            # Convert the frame to a numpy array
+            input_image = np.array(frame, dtype=np.uint8)
+
+            # Define the output dimensions (e.g., after rotation and flip)
+            height, width, channels = frame.shape
+            input_width = width
+            input_height = height
+            output_width = input_height
+            output_height = input_width
+
+            # Set up the output image buffer
+            output_image = np.zeros((output_height, output_width, 3), dtype=np.uint8)
+
+            # Create OpenCL buffers
+            input_buffer = cl.Buffer(context, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=input_image)
+            output_buffer = cl.Buffer(context, cl.mem_flags.WRITE_ONLY, size=output_image.nbytes)
+
+
+            # Execute the OpenCL kernel for image transformation (rotation + flip)
+            global_work_size = (output_width, output_height)  # Use output dimensions
+            rotate_flip_cl.transform_image(queue, global_work_size, None,  # `None` for local work size
+                               input_buffer, output_buffer, 
+                               np.uint32(input_width), np.uint32(input_height), 
+                               np.uint32(output_width), np.uint32(output_height))
+
+            # Read the result back into Python
+            cl.enqueue_copy(queue, output_image, output_buffer).wait()
+
+            # Convert the transformed image back to Pygame surface for rendering
+            frame = pygame.surfarray.make_surface(frame)
+
+            # Resize the image to the correct dimensions
+            #frame = pygame.transform.scale(frame, (WIDTH, HEIGHT))
+
+
+            # Create a surface from the frame
+            #frame = pygame.surfarray.make_surface(frame)
                     
-                # Create a surface from the frame
-                frame_surface = pygame.surfarray.make_surface(frame_rgb)
-                    
-                # Rotate the image so it has a correct rotation
-                frame_surface = pygame.transform.rotate(frame_surface, -90)
+            # Rotate the image so it has a correct rotation
+            #frame = pygame.transform.rotate(frame, -90)
 
-                # Flip the image so it's not mirrored
-                frame_surface = pygame.transform.flip(frame_surface, True, False)
+            # Flip the image so it's not mirrored
+            #frame = pygame.transform.flip(frame, True, False)
 
-                # Resize the frame to fit the window
-                frame_surface = pygame.transform.scale(frame_surface, (WIDTH, HEIGHT))
+            #oldtime = acttime
 
-                oldtime = acttime
 
-    if keyboard.lctrl:
-        if keyboard.l:
-            exit()
-        if keyboard.r:
-            video_path = vid_reload()
+    if gc.garbage:
+        gc.collect()
+    locals().clear()
+
+# Set the FPS for the program loop
+clock.schedule_interval(update_, 1 / FPS)
+
 
 
 def draw():
-    global frame_surface
+    global frame
     if window_maximized():
-        if frame_surface:
-            screen.blit(frame_surface, (0, 0))  # Display the frame
-            frame_surface = None
-
+        if frame:
+            screen.blit(frame, (0, 0))  # Display the frame
+            frame = None
+    locals().clear()
 
 
 

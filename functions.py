@@ -5,6 +5,10 @@ import pygetwindow as gw
 with open("config.json", "r") as f:
     config = json.load(f)
 
+# Making variables global to avoid memory usage
+opti = None
+oldwin = None
+
 # Setting the function for video reloading/changing
 def vid_reload():
 	global config
@@ -13,6 +17,7 @@ def vid_reload():
 
 # Looking if the user is using an app that is in fullscreen
 def window_maximized():
+	global opti
 	# Get all the open windows
 	windows = gw.getAllWindows()
 
@@ -26,6 +31,7 @@ def window_maximized():
 		if active_window != None and active_window.isMaximized:
 			opti = False
 
+	locals().clear()
 	return opti
 
 # Going to the previously used window if the pgz win selected
@@ -36,6 +42,8 @@ def if_pgz_active_win(oldwin):
 			oldwin[0].activate()
 			return oldwin
 		else:
+			locals().clear()
 			return gw.getWindowsWithTitle(gw.getActiveWindowTitle())
 	else:
+		locals().clear()
 		return oldwin
