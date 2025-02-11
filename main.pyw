@@ -169,18 +169,13 @@ __kernel void transform_image(__global uchar *input_image,
         int global_x = local_x + output_width/2;
         int global_y = local_y + output_height/2;
 
-        // RGB array creation
-        int c[3] = {input_image[i][j][0], input_image[i][j][1], input_image[i][j][2]};
+        // Outputing RGB channels
+        int input_index = (global_y * input_width + global_x) * 3;
+        int output_index = (j * output_width + i) * 3;
 
-        // Ensure within valid bounds
-        if (flip_x >= 0 && flip_x < input_width && src_y >= 0 && src_y < input_height) {
-            int input_index = (src_y * input_width + flip_x) * 3;  
-            int output_index = (j * output_width + i) * 3;  // ✅ FIXED INDEXING
-
-            // Copy RGB values
-            output_image[output_index] = input_image[input_index];
-            output_image[output_index + 1] = input_image[input_index + 1];
-            output_image[output_index + 2] = input_image[input_index + 2];
+        output_image[output_index] = input_image[input_index];          // Red channel
+        output_image[output_index + 1] = input_image[input_index + 1];  // Green channel
+        output_image[output_index + 2] = input_image[input_index + 2];  // Blue channel
         }
     }
 }
