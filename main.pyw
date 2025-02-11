@@ -142,40 +142,25 @@ queue = cl.CommandQueue(context)
 
 # OpenCL kernel to rotate and flip the image
 transform_kernel = """
-__kernel void transform_image(__global uchar *input_image, 
-                              __global uchar *output_image,
-                              const unsigned int input_width, 
-                              const unsigned int input_height,
-                              const unsigned int output_width, 
-                              const unsigned int output_height) {
+__kernel void transform_image(__global uchar *in_image, 
+                              __global uchar *out_image,
+                              const unsigned int in_width, 
+                              const unsigned int in_height,
+                              const unsigned int out_width, 
+                              const unsigned int out_height) {
 
     int i = get_global_id(0);  // X-coordinate in output
     int j = get_global_id(1);  // Y-coordinate in output
 
-    if (i < input_width && j < input_height) {
-        // Get local cords with the center being the origin
-        int local_x = i - input_width/2;
-        int local_y = j - input_height/2;
+    if (i < in_width && j < in_height) {
+    
+        int out_index = (j * out_width + i) * 3;
+        int in_index = (j * in_width + (in_width - 1 - i)) * 3;
+    
+        out_image[out_index]     = in_image[in_index];  
+        out_image[out_index + 1] = in_image[in_index + 1];  
+        out_image[out_index + 2] = in_image[in_index + 2];  
         
-        // Correct 90° counterclockwise rotation
-        int temp = local_x;
-        local_x = -1 * local_y;
-        local_y = temp;
-
-        // Horizontal flip (AFTER rotation)
-        local_x *= -1;
-
-        // Transform local cords into global cords
-        int global_x = local_x + output_width/2;
-        int global_y = local_y + output_height/2;
-
-        // Outputing RGB channels
-        int input_index = (global_y * input_width + global_x) * 3;
-        int output_index = (j * output_width + i) * 3;
-
-        output_image[output_index] = input_image[input_index];          // Red channel
-        output_image[output_index + 1] = input_image[input_index + 1];  // Green channel
-        output_image[output_index + 2] = input_image[input_index + 2];  // Blue channel
         }
     }
 }
@@ -246,7 +231,10 @@ def update_():
             input_buffer = cl.Buffer(context, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=input_image)
             output_buffer = cl.Buffer(context, cl.mem_flags.WRITE_ONLY, size=output_image.nbytes)
 
-
+            # Flattens the images into 1D arrays
+            input_image = input_image.flatten()  # Convert from (H, W, 3) to (H * W * 3)
+            output_image = output_image.flatten()
+            
             # Execute the OpenCL kernel for image transformation (rotation + flip)
             global_work_size = (input_width, input_height)  # Use output dimensions
             rotate_flip_cl.transform_image(queue, global_work_size, None,  # `None` for local work size
@@ -258,6 +246,7 @@ def update_():
             cl.enqueue_copy(queue, output_image, output_buffer).wait()
 
             # Convert the transformed image back to Pygame surface for rendering
+            frame = output_image.reshape((output_height, output_width, 3)
             frame = pygame.surfarray.make_surface(frame)
 
             # Resize the image to the correct dimensions
