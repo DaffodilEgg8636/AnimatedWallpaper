@@ -152,13 +152,25 @@ __kernel void transform_image(__global uchar *input_image,
     int i = get_global_id(0);  // X-coordinate in output
     int j = get_global_id(1);  // Y-coordinate in output
 
-    if (i < output_width && j < output_height) {
+    if (i < input_width && j < input_height) {
+        // Get local cords with the center being the origin
+        int local_x = i - input_width/2;
+        int local_y = j - input_height/2;
+        
         // Correct 90° counterclockwise rotation
-        int src_x = j;
-        int src_y = input_width - 1 - i;
+        int temp = local_x;
+        local_x = -1 * local_y;
+        local_y = temp;
 
         // Horizontal flip (AFTER rotation)
-        int flip_x = input_width - 1 - src_x;
+        local_x *= -1;
+
+        // Transform local cords into global cords
+        int global_x = local_x + output_width/2;
+        int global_y = local_y + output_height/2;
+
+        // RGB array creation
+        int c[3] = {input_image[i][j][0], input_image[i][j][1], input_image[i][j][2]};
 
         // Ensure within valid bounds
         if (flip_x >= 0 && flip_x < input_width && src_y >= 0 && src_y < input_height) {
@@ -241,7 +253,7 @@ def update_():
 
 
             # Execute the OpenCL kernel for image transformation (rotation + flip)
-            global_work_size = (output_width, output_height)  # Use output dimensions
+            global_work_size = (input_width, input_height)  # Use output dimensions
             rotate_flip_cl.transform_image(queue, global_work_size, None,  # `None` for local work size
                                input_buffer, output_buffer, 
                                np.uint32(input_width), np.uint32(input_height), 
