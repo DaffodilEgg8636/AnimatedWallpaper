@@ -246,8 +246,8 @@ def update_():
             cl.enqueue_copy(queue, output_image, output_buffer).wait()
 
             # Convert the transformed image back to Pygame surface for rendering
-            frame = output_image.reshape((output_height, output_width, 3)
-            frame = pygame.surfarray.make_surface(frame)
+            #frame = output_image.reshape((output_height, output_width, 3)
+            frame = pygame.surfarray.make_surface(output_image)
 
             # Resize the image to the correct dimensions
             #frame = pygame.transform.scale(frame, (WIDTH, HEIGHT))
